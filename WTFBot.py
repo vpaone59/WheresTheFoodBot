@@ -109,6 +109,7 @@ async def on_message(message):
     await client.process_commands(message)
 
 
+# checks if the foodlist is empty. Probably a useless function. I don't care.
 def isempty():
 
     if len(foodlist) == 0:
@@ -134,6 +135,8 @@ async def food(ctx):
 
 # params: ctx, the context in which the command is used
 @client.command()
+# command can only be sent 1 time, every 3 seconds, per user.
+@commands.cooldown(1, 3, commands.BucketType.user)
 async def foodsearch(ctx, *keywords):
     kw = ' '.join(keywords)
     googlefoods(kw)
@@ -164,6 +167,8 @@ async def foodsearch(ctx, *keywords):
 
 # print out all of the items in foodlist to the channel the command was run in
 @client.command()
+# command can only be sent 1 time, every 3 seconds, per user.
+@commands.cooldown(1, 3, commands.BucketType.user)
 async def getfoodlist(ctx):
 
     if isempty() == 0:
@@ -180,10 +185,10 @@ async def getfoodlist(ctx):
 # only admin should be able to run this
 # param: ctx - The context of which the command is entered
 # param: food - The food item/restaurant you want to add to the list
-@ client.command(aliases=['af'])
-@ commands.has_permissions(administrator=True)
+@client.command(aliases=['af'])
+@commands.has_permissions(administrator=True)
 # command can only be sent 1 time, every 3 seconds, per user.
-@ commands.cooldown(1, 3, commands.BucketType.user)
+@commands.cooldown(1, 3, commands.BucketType.user)
 async def addfood(ctx, *args):
     # check if the food is already in the list
     food = ' '.join(args)
@@ -206,10 +211,10 @@ async def addfood(ctx, *args):
 # only admin should be able to run this
 # param: ctx - The context of which the command is entered
 # param: food - The food item you want to remove from the list
-@ client.command(aliases=['rf'])
-@ commands.has_permissions(administrator=True)
+@client.command(aliases=['rf'])
+@commands.has_permissions(administrator=True)
 # food can only be sent 1 time, every 3 seconds, per user.
-@ commands.cooldown(1, 3, commands.BucketType.user)
+@commands.cooldown(1, 3, commands.BucketType.user)
 async def remfood(ctx, *args):
     food = ' '.join(args)
     print(type(food))
@@ -233,8 +238,10 @@ async def remfood(ctx, *args):
 # !!!!!! this command utilizes the googlefoods() function AND WILL OVERWRITE any data in the google_results.json file
 # params: ctx - The context in which the command is used
 # params: *keywords - Multiple String objects that are combined into a single keyword query
-@ commands.has_permissions(administrator=True)
+# params: ctx, the context in which the command is used
 @client.command()
+# command can only be sent 1 time, every 3 seconds, per user.
+@commands.cooldown(1, 3, commands.BucketType.user)
 async def detailedfood(ctx, *keywords):
     # combine the Strings entered in *keywords
     kw = ' '.join(keywords)
