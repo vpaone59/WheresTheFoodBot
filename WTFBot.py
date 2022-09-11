@@ -16,6 +16,7 @@ import random
 import googlemaps
 import requests
 import discord
+import time
 
 # set the current working directory to a variable, print to console
 current_directory = os.getcwd()
@@ -281,21 +282,23 @@ async def detailedfood(ctx, *keywords):
     reviews = details["result"]["reviews"]
 
     # loop to get the reviews and add to a variable for sending later
-    x = 0
+    # we use x as a limiter to only grab X reviews. Discord only allows 2000 characters per message, so sending the total 5 reviews is too much and will cause NO reviews to print
+    x = 2
     print_reviews = ""
+
     for r in reviews:
+        while x > 0:
+            r = reviews[x]
 
-        r = reviews[x]
+            nam = r["author_name"]
+            ratin = r["rating"]
+            tim = r["relative_time_description"]
+            revie = r["text"]
 
-        nam = r["author_name"]
-        ratin = r["rating"]
-        tim = r["relative_time_description"]
-        revie = r["text"]
-
-        print_reviews = print_reviews + \
-            "\nAuthor Name: " + nam + "\nRating: " + \
-            str(ratin) + "\nPosted: " + tim + "\nReview: " + revie + "\n"
-        x += 1
+            print_reviews = print_reviews + \
+                "\nAuthor Name: " + nam + "\nRating: " + \
+                str(ratin) + "\nPosted: " + tim + "\nReview: " + revie + "\n"
+            x = x - 1
 
     # set the "open" status of the location returned
     if open_now["open_now"] == True:
@@ -311,6 +314,7 @@ async def detailedfood(ctx, *keywords):
     await ctx.send(file=discord.File(current_directory + "/google_search/photo.jpg"))
 
     # print some reviews (top 5) for the location
+    time.sleep(2)
     await ctx.send(f"```Here are some reviews:\n{print_reviews}```")
 
 
