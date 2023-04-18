@@ -1,6 +1,6 @@
 # Vincent Paone
 # Project began 6/30/2022 --
-# WTFBot - What the food bot  - main file
+# WTFBot - Where's The Food Discord Bot  - main file
 #
 
 import os
@@ -12,20 +12,19 @@ import random
 import googlemaps
 import requests
 import discord
+from dotenv import load_dotenv
 
+load_dotenv() # loads the .env file
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix=os.getenv('PREFIX'), intents=intents)
 
-
-TOKEN = 'OTk2NTE4NDkyODEzNjc2NTk1.GyQeMg.dg7SKP10-2Iaimvf5vUcj39OefoO-FbD6PAH_A'
+TOKEN = os.getenv('DISCORD_TOKEN')
 print(TOKEN)
 googlekey = os.getenv("GOOGLE_KEY")
 print(googlekey)
 # gmaps = googlemaps.Client(key=googlekey)
-
-
 
 async def main():
     """
@@ -68,6 +67,9 @@ async def on_message(message):
 
 @bot.command(aliases=['additem'])
 async def add_food(ctx, add_on):
+    """
+    Add a food item to the food list. Takes one String parameter
+    """
     if not add_on:
         await ctx.send("Can't add blank or none item")
     elif add_on in food_list:
@@ -79,7 +81,9 @@ async def add_food(ctx, add_on):
 @bot.command(aliases=['getlist'])
 @commands.cooldown(1, 3, commands.BucketType.user)
 async def get_food_list(ctx):
-
+    """
+    Display the food list if there is at least one item
+    """
     if len(food_list) == 0:
         await ctx.send("No items in the list")
     else:
@@ -91,19 +95,25 @@ async def get_food_list(ctx):
 
 @bot.command(aliases=['editlist'])
 async def edit_food_list(ctx):
-    await ctx.send('Choose an option:', view=Edit_Food_List_Buttons())
+    """
+    A function built with button views to allow the user to easily edit the food list using buttons, inputs, etc
+    """
+    await ctx.send('Choose an option:', view=Edit_Food_List())
 
-class Edit_Food_List_Buttons(discord.ui.View):
-    def __init__(self, *, timeout= 180):
+class Edit_Food_List(discord.ui.View):
+    """
+    View that shows the buttons for the edit food list command
+    """
+    def __init__(self, *, timeout=120):
         super().__init__(timeout=timeout)
 
-    @discord.ui.button(label="Edit", style=discord.ButtonStyle.blurple)
-    async def edit_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
-        await interaction.response.send_message("Edit list")
-
-    @discord.ui.button(label="Add Item", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="Add Item", style=discord.ButtonStyle.blurple)
     async def add_item_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
         await interaction.response.send_message("Add item")
+
+    @discord.ui.button(label="Remove Item", style=discord.ButtonStyle.red)
+    async def remove_item_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
+        await interaction.response.send_message("Remove item")
 
 asyncio.run(main())
 
