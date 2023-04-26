@@ -8,7 +8,6 @@ import asyncio
 from tokenize import String
 from discord.ext import commands
 from discord.utils import get
-import random
 import googlemaps
 import requests
 import discord
