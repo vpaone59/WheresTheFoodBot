@@ -1,2 +1,5 @@
 .venv
 .env
+
+/google_search
+/place_details

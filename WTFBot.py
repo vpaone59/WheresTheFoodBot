@@ -14,27 +14,26 @@ import requests
 import discord
 from dotenv import load_dotenv
 
-load_dotenv() # loads the .env file
+# loads the .env file and assign environment variables
+load_dotenv() 
+TOKEN = os.getenv('DISCORD_TOKEN')
+GOOGLE_KEY = os.getenv("GOOGLE_KEY")
+google_client = googlemaps.Client(key=GOOGLE_KEY)
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix=os.getenv('PREFIX'), intents=intents)
 
-TOKEN = os.getenv('DISCORD_TOKEN')
-print(TOKEN)
-googlekey = os.getenv("GOOGLE_KEY")
-print(googlekey)
-# gmaps = googlemaps.Client(key=googlekey)
-
 async def main():
     """
     main function that starts the Bot
     """
-    global food_list # storing user input in this list
+    # storing user input in this list
+    global food_list 
     food_list = []
 
     async with bot:
-        await bot.start('OTk2NTE4NDkyODEzNjc2NTk1.GyQeMg.dg7SKP10-2Iaimvf5vUcj39OefoO-FbD6PAH_A')
+        await bot.start(TOKEN)
         # on_ready will run next
 
 @bot.event
@@ -42,15 +41,12 @@ async def on_ready():
     """
     runs once the bot establishes a connection with Discord
     """
-    print(f'Logged in as {bot.user}')
     try:
+        print(f'Logged in as {bot.user}')
         print("Bot ready")
     except Exception as e:
         print(f'Bot not ready {e}')
 
-
-# every time there is a message in any channel in any guild, this runs
-# param: message - The message content that was last sent
 @bot.event
 async def on_message(message):
     """
@@ -65,7 +61,7 @@ async def on_message(message):
     await bot.process_commands(message)
 
 
-@bot.command(aliases=['additem'])
+@bot.command(aliases=['add_item', 'add'])
 async def add_food(ctx, add_on):
     """
     Add a food item to the food list. Takes one String parameter
@@ -78,7 +74,8 @@ async def add_food(ctx, add_on):
         food_list.append(add_on)
         print(food_list)
 
-@bot.command(aliases=['getlist'])
+
+@bot.command(aliases=['get_list', 'list'])
 @commands.cooldown(1, 3, commands.BucketType.user)
 async def get_food_list(ctx):
     """
@@ -93,7 +90,8 @@ async def get_food_list(ctx):
             x += f_but_string + '\n'
         await ctx.send(f"```{x}```")
 
-@bot.command(aliases=['editlist'])
+
+@bot.command(aliases=['edit_list', 'edit'])
 async def edit_food_list(ctx):
     """
     A function built with button views to allow the user to easily edit the food list using buttons, inputs, etc
@@ -104,6 +102,8 @@ class Edit_Food_List(discord.ui.View):
     """
     View that shows the buttons for the edit food list command
     """
+    global food_list
+
     def __init__(self, *, timeout=120):
         super().__init__(timeout=timeout)
 
@@ -115,114 +115,85 @@ class Edit_Food_List(discord.ui.View):
     async def remove_item_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
         await interaction.response.send_message("Remove item")
 
-asyncio.run(main())
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
+        await interaction.message.delete()
+
+class Questionnaire(discord.ui.Modal, title='Questionnaire Response'):
+    name = discord.ui.TextInput(label='Name')
+    answer = discord.ui.TextInput(label='Answer', style=discord.TextStyle.paragraph)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.send_message(f'Thanks for your response, {self.name}!', ephemeral=True)
 
 
+@bot.command(aliases=['search'])
+@commands.cooldown(1, 3, commands.BucketType.user)
+async def food_search(ctx, *keywords):
+
+    kw = ' '.join(keywords)
+    data = google_foods(kw)
+    
+    status = data["status"]
+    if status ==  'REQUEST_DENIED':
+        await ctx.send(f"ERROR")
+        return
+
+    name = data["results"][0]["name"]
+    address = data["results"][0]["formatted_address"]
+    status = data["results"][0]["business_status"]
+    open_now = data["results"][0]["opening_hours"]
+    photo_ref_id = data["results"][0]["photos"][0]["photo_reference"]
+    average_rating = data["results"][0]["rating"]
+    total_ratings = data["results"][0]["user_ratings_total"]
+
+    google_food_photo(photo_ref_id)
+    # adjust the open status of the restaurant
+    if open_now["open_now"] == True:
+        open_status = "open"
+    else:
+        open_status = "closed"
+
+    await ctx.send(f"We found a result near you for {name}. It's located at {address} and is currently {open_status} and {status.lower()}.\n"
+                   "This location of {name} has an Average Rating (out of 5⭐️) of {average_rating}⭐️, with {total_ratings} total customer ratings.", file=discord.File("./google_search/photo.jpg"))
 
 
+async def google_foods(keyword):
+    """
+    Use the Google Places API key to search for a restaurant and/or location keyword
+    By default google will use current IP location to find a result, unless a location is specified with the keyword
+    For example "mcdonalds 90210"
+    """
+    searchurl = "https://maps.googleapis.com/maps/api/place/textsearch/json?query=" 
+    url = searchurl + keyword + "&type=restaurant&key=" + GOOGLE_KEY
+    return requests.get(url).json()    
+    
 
-# # params: ctx, the context in which the command is used
+async def google_food_photo(photo_reference_id):
+    """
+    Use a provided photo reference id to search for and construct the photo in the google_search directory
+    """
+    photo_height = 400
+    photo_width = 400
+    raw_image_data = google_client.places_photo(
+        photo_reference=photo_reference_id, max_height=photo_height, max_width=photo_width)
+    
+    f = open('./google_search/photo.jpg', 'wb+')
+    for chunk in raw_image_data:
+        if chunk:
+            f.write(chunk)
+        else:
+            print("ALL CHUNKS LOADED")
+
+
 # @bot.command()
-# # command can only be sent 1 time, every 3 seconds, per user.
-# @commands.cooldown(1, 3, commands.BucketType.user)
-# async def foodsearch(ctx, *keywords):
-#     kw = ' '.join(keywords)
-#     googlefoods(kw)
-
-#     with open("./google_search/google_results.json", "r+") as f:
-#         data = json.load(f)
-
-#     name = data["results"][0]["name"]
-#     address = data["results"][0]["formatted_address"]
-#     status = data["results"][0]["business_status"]
-#     open_now = data["results"][0]["opening_hours"]
-#     photo_ref_id = data["results"][0]["photos"][0]["photo_reference"]
-#     average_rating = data["results"][0]["rating"]
-#     total_ratings = data["results"][0]["user_ratings_total"]
-
-#     if open_now["open_now"] == True:
-#         open_status = "open"
-#     else:
-#         open_status = "closed"
-#     await ctx.send(f"```We found a result near you for {name}. It's located at {address} and is currently {open_status} and {status.lower()}.```")
-
-#     await ctx.send(f"```This particular location of {name} has an Average Rating (out of 5⭐️) of {average_rating}⭐️, with {total_ratings} total customer ratings.```")
-
-#     googlefoodphoto(photo_ref_id)
-
-#     await ctx.send(file=discord.File(current_directory + "/google_search/photo.jpg"))
-
-
-
-
-        
-# # add a food item to the foodlist.json
-# # only admin should be able to run this
-# # param: ctx - The context of which the command is entered
-# # param: food - The food item/restaurant you want to add to the list
-# @client.command(aliases=['af'])
-# @commands.has_permissions(administrator=True)
-# # command can only be sent 1 time, every 3 seconds, per user.
-# @commands.cooldown(1, 3, commands.BucketType.user)
-# async def addfood(ctx, *args):
-#     # check if the food is already in the list
-#     food = ' '.join(args)
-#     if food.lower() in foodlist:
-#         await ctx.send("```{} is already in the list!```".format(food))
-#     else:
-#         foodlist.append(food.lower())
-#         # add it to the list
-#         with open("./foodlist.json", "r+") as f:
-#             data = json.load(f)
-#             data["FOOD"] = foodlist
-#             f.seek(0)
-#             f.write(json.dumps(data))
-#             f.truncate()  # resizes file
-
-#         await ctx.send("```{} added to the food list```".format(food))
-
-
-# # add a food item to the foodlist.json
-# # only admin should be able to run this
-# # param: ctx - The context of which the command is entered
-# # param: food - The food item you want to remove from the list
-# @client.command(aliases=['rf'])
-# @commands.has_permissions(administrator=True)
-# # food can only be sent 1 time, every 3 seconds, per user.
-# @commands.cooldown(1, 3, commands.BucketType.user)
-# async def remfood(ctx, *args):
-#     food = ' '.join(args)
-#     print(type(food))
-#     if food.lower() in foodlist:
-#         foodlist.remove(food.lower())
-#         with open("./foodlist.json", "r+") as f:
-#             data = json.load(f)
-#             data["FOOD"] = foodlist
-#             f.seek(0)
-#             f.write(json.dumps(data))
-#             f.truncate()
-
-#         await ctx.send("```{} removed from the food list```".format(food))
-
-#     # if the word isn't in the list
-#     else:
-#         await ctx.send("```{} is not in the list```".format(food))
-
-
-# # a version of foodsearch that grabs more details from the location using a 2nd API call
-# # !!!!!! this command utilizes the googlefoods() function AND WILL OVERWRITE any data in the google_results.json file
-# # params: ctx - The context in which the command is used
-# # params: *keywords - Multiple String objects that are combined into a single keyword query
-# # params: ctx, the context in which the command is used
-# @client.command()
-# # command can only be sent 1 time, every 3 seconds, per user.
 # @commands.cooldown(1, 3, commands.BucketType.user)
 # async def detailedfood(ctx, *keywords):
 #     # combine the Strings entered in *keywords
 #     kw = ' '.join(keywords)
-#     googlefoods(kw)
+#     google_foods(kw)
 
-#     # open the details.json created in googlefoods()
+#     # open the details.json created in google_foods()
 #     with open("./google_search/google_results.json", "r+") as f:
 #         data = json.load(f)
 
@@ -248,7 +219,7 @@ asyncio.run(main())
 #     moredetails(place_id)
 
 #     # use the phote ref id to get the photo
-#     googlefoodphoto(photo_ref_id)
+#     google_food_photo(photo_ref_id)
 
 #     with open("./place_details/details.json", "r+") as f:
 #         details = json.load(f)
@@ -288,56 +259,8 @@ asyncio.run(main())
 #     # print some reviews (top 5) for the location
 #     await ctx.send(f"```Here are some reviews:\n{print_reviews}```")
 
-
-# # create a Google Maps API request url using user provided keywords
-# # fills json google_results.json with the data returned
-# # this specific function searches for locations with type=restaurant
-# # params: keyword - The query to search for when making the API call
-# def googlefoods(keyword):
-
-#     searchurl = "https://maps.googleapis.com/maps/api/place/textsearch/json?query="
-
-#     # by default google will use current IP to find a result
-#     url = searchurl + keyword + "&type=restaurant&key=" + googlekey
-#     print(url)
-#     data = requests.get(url).json()
-
-#     if os.path.exists(current_directory + "/google_search/google_results.json"):
-#         print("GOOGLE_RESULTS.JSON PATH EXISTS")
-#         with open(current_directory + "/google_search/google_results.json", "w+") as f:
-#             json.dump(data, f)
-
-#     else:
-#         print("GOOGLE_RESULTS.JSON PATH DOES NOT EXIST")
-#         with open(current_directory + "/google_search/google_results.json", "w+") as f:
-#             print("CREATED GOOGLE_RESULTS.JSON")
-#             json.dump(data, f)
-#             # dump the configTemplate to the new config.json
-
-
-# # creates the photo file for the location returned in foodsearch
-# # params: photo_reference_id - The reference id to the photo created when googlefoods() is called
-# def googlefoodphoto(photo_reference_id):
-#     photo_height = 400
-#     photo_width = 400
-#     raw_image_data = gmaps.places_photo(
-#         photo_reference=photo_reference_id, max_height=photo_height, max_width=photo_width)
-
-#     print("PHOTO DATA FOUND")
-#     # open or create new file photo.jpg
-#     # w: Open a file for writing. Creates a new file if it does not exist or truncates the file if it exists.
-#     # b: Open in binary mode.
-#     f = open('./google_search/photo.jpg', 'wb+')
-#     print("PHOTO FILE CREATED")
-#     for chunk in raw_image_data:
-#         if chunk:
-#             f.write(chunk)
-#         else:
-#             print("ALL CHUNKS LOADED")
-
-
-# # using the place_id generated from googlefoods() we can make another API call to get information that textsearch can't get
-# # params: placeid - The place_id generated from googlefoods()
+# # using the place_id generated from google_foods() we can make another API call to get information that textsearch can't get
+# # params: placeid - The place_id generated from google_foods()
 # def moredetails(placeid):
 
 #     searchurl = "https://maps.googleapis.com/maps/api/place/details/json?place_id="
@@ -346,7 +269,7 @@ asyncio.run(main())
 
 #     # by default google will use current IP for location when finding a result
 #     # create the url request
-#     url = searchurl + placeid + "&key=" + googlekey
+#     url = searchurl + placeid + "&key=" + GOOGLE_KEY
 #     print(url)
 #     data = requests.get(url).json()
 
@@ -361,6 +284,15 @@ asyncio.run(main())
 #             print("CREATED details.JSON")
 #             json.dump(data, f)
 #             # dump the configTemplate to the new config.json
+
+
+
+asyncio.run(main())
+
+
+
+
+
 
 
 
