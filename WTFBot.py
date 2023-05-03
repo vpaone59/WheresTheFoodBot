@@ -103,20 +103,25 @@ class Edit_Food_List(discord.ui.View):
     """
     global food_list
 
-    def __init__(self, *, timeout=120):
+    def __init__(self, *, timeout=None):
         super().__init__(timeout=timeout)
+
+    @discord.ui.button(label="Show List", style=discord.ButtonStyle.blurple)
+    async def show_items_button(self, interaction: discord.Interaction, button: discord.ui.Button):        
+        await interaction.response.defer()
+        await get_food_list(interaction.channel)
 
     @discord.ui.button(label="Add Item", style=discord.ButtonStyle.blurple)
     async def add_item_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
         await interaction.response.send_message("Add item")
 
     @discord.ui.button(label="Remove Item", style=discord.ButtonStyle.red)
-    async def remove_item_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
+    async def remove_item_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Remove item")
 
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
-    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
-        await interaction.message.delete()
+    # @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    # async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    #     await interaction.message.delete()
 
 class Questionnaire(discord.ui.Modal, title='Questionnaire Response'):
     name = discord.ui.TextInput(label='Name')
