@@ -28,10 +28,10 @@ async def main():
     main function that starts the Bot
     """
     # storing user input in this list
-    global food_list 
-    food_list = []
+    
 
     async with bot:
+        await load_all()
         await bot.start(TOKEN)
         # on_ready will run next
 
@@ -60,69 +60,6 @@ async def on_message(message):
     await bot.process_commands(message)
 
 
-@bot.command(aliases=['add_item', 'add'])
-async def add_food(ctx, add_on):
-    """
-    Add a food item to the food list. Takes one String parameter
-    """
-    if not add_on:
-        await ctx.send("Can't add blank or none item")
-    elif add_on in food_list:
-        await ctx.send("Item already in the list")
-    else:
-        food_list.append(add_on)
-        print(food_list)
-
-
-@bot.command(aliases=['get_list', 'list'])
-@commands.cooldown(1, 3, commands.BucketType.user)
-async def get_food_list(ctx):
-    """
-    Display the food list if there is at least one item
-    """
-    if len(food_list) == 0:
-        await ctx.send("No items in the list")
-    else:
-        x = ''
-        for f in food_list:
-            f_but_string = str(f)
-            x += f_but_string + '\n'
-        await ctx.send(f"```{x}```")
-
-
-@bot.command(aliases=['edit_list', 'edit'])
-async def edit_food_list(ctx):
-    """
-    A function built with button views to allow the user to easily edit the food list using buttons, inputs, etc
-    """
-    await ctx.send('Choose an option:', view=Edit_Food_List())
-
-class Edit_Food_List(discord.ui.View):
-    """
-    View that shows the buttons for the edit food list command
-    """
-    global food_list
-
-    def __init__(self, *, timeout=None):
-        super().__init__(timeout=timeout)
-
-    @discord.ui.button(label="Show List", style=discord.ButtonStyle.blurple)
-    async def show_items_button(self, interaction: discord.Interaction, button: discord.ui.Button):        
-        await interaction.response.defer()
-        await get_food_list(interaction.channel)
-
-    @discord.ui.button(label="Add Item", style=discord.ButtonStyle.blurple)
-    async def add_item_button(self, interaction: discord.Interaction, button: discord.ui.Button,):
-        await interaction.response.send_message("Add item")
-
-    @discord.ui.button(label="Remove Item", style=discord.ButtonStyle.red)
-    async def remove_item_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Remove item")
-
-    # @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
-    # async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-    #     await interaction.message.delete()
-
 class Questionnaire(discord.ui.Modal, title='Questionnaire Response'):
     name = discord.ui.TextInput(label='Name')
     answer = discord.ui.TextInput(label='Answer', style=discord.TextStyle.paragraph)
@@ -137,10 +74,11 @@ async def food_search(ctx, *keywords):
 
     kw = ' '.join(keywords)
     data = google_foods(kw)
-    
+
     status = data["status"]
+    # if the request is denied we just exit the method and send an error message
     if status ==  'REQUEST_DENIED':
-        await ctx.send(f"ERROR")
+        await ctx.send(f"ERROR\n{data}")
         return
 
     name = data["results"][0]["name"]
@@ -158,11 +96,11 @@ async def food_search(ctx, *keywords):
     else:
         open_status = "closed"
 
-    await ctx.send(f"We found a result near you for {name}. It's located at {address} and is currently {open_status} and {status.lower()}.\n"
-                   "This location of {name} has an Average Rating (out of 5⭐️) of {average_rating}⭐️, with {total_ratings} total customer ratings.", file=discord.File("./google_search/photo.jpg"))
+    print(name, address, status, open_now, photo_ref_id, average_rating, total_ratings)
+    await ctx.send(f"We found you a result for {name}. It's located at {address} and is currently {open_status} and {status.lower()}.\nThis location of {name} has an Average Rating of {average_rating}⭐️/5⭐️, with {total_ratings} total customer ratings!", file=discord.File("./google_search/photo.jpg"))
 
 
-async def google_foods(keyword):
+def google_foods(keyword):
     """
     Use the Google Places API key to search for a restaurant and/or location keyword
     By default google will use current IP location to find a result, unless a location is specified with the keyword
@@ -173,7 +111,7 @@ async def google_foods(keyword):
     return requests.get(url).json()    
     
 
-async def google_food_photo(photo_reference_id):
+def google_food_photo(photo_reference_id):
     """
     Use a provided photo reference id to search for and construct the photo in the google_search directory
     """
@@ -289,7 +227,78 @@ async def google_food_photo(photo_reference_id):
 #             json.dump(data, f)
 #             # dump the configTemplate to the new config.json
 
+async def load_Cogs():
+    """
+    Function to load all Cogs that live in the cogs folder
+    Ran on Bot startup
+    """
+    for filename in os.listdir(os.getcwd() + '/cogs'):
+        if filename.endswith('.py'):
+            try:
+                # -3 cuts the .py extension from filename
+                await bot.load_extension(f'cogs.{filename[:-3]}')
+                print(f'Cog {filename} loaded')
+            except commands.ExtensionAlreadyLoaded:
+                print(f'Cog {filename} aleady loaded')
+            except Exception as e:
+                print(f'Cog {filename} NOT loaded\n{e}')
 
+
+async def unload_Cogs():
+    """
+    Function to unload all Cogs in the cogs folder
+    Runs on -rl all
+    """
+    for filename in os.listdir(os.getcwd() + '/cogs'):
+        if filename.endswith('.py'):
+            try:
+                await bot.unload_extension(f'cogs.{filename[:-3]}')
+                print(f'Cog {filename} unloaded successfully')
+            except commands.ExtensionNotLoaded:
+                print(f'Cog {filename} is not loaded')
+
+
+async def load_all():
+    """
+    goes through the /cogs dir and tries to load \
+    every file with .py extension
+    """
+    for filename in os.listdir('./cogs'):
+        if filename.endswith('.py'):
+            try:
+                await bot.load_extension(f'cogs.{filename[:-3]}')
+                print(f'{filename} loaded')
+            except Exception as e:
+                print(f'Could not load {filename}\n{e}')
+
+
+@bot.command(aliases=['rf', 'rl'], description='Reloads all Cog files')
+@commands.has_permissions(administrator=True)
+async def refresh(ctx, extension):
+    """
+    reload cog file, same as doing unload then load, do -refresh "name of cog file" or -rf all
+    only admin should be able to run this
+    param: ctx - The context in which the command has been executed
+    param: extension - The name of the Cog file to reload
+    """
+    if extension == 'all':
+        # unload, then load
+        await unload_Cogs()
+        await load_Cogs()
+        await ctx.send('```Success reloading all cogs```')
+    else:
+        try:
+            print(f'> Reloading {extension}.py --')
+            await bot.reload_extension(f'cogs.{extension}')
+            print(f'> -- {extension}.py reloaded.')
+            await ctx.send(f'```Cog {extension}.py reloaded```')
+
+        except commands.ExtensionNotFound:
+            await ctx.send(f'```Cog {extension}.py not in directory```')
+
+        except Exception as e:
+            print(f'> -- {extension}.py could not be reloaded \n{e}')
+            await ctx.send(f'```Cog {extension}.py could not be reloaded \n{e}```')
 
 asyncio.run(main())
 
